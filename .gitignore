@@ -1,0 +1,9 @@
+node_modules/
+docs/
+dist/
+*.log
+*.tsbuildinfo
+.idea
+git
+.env.production.local
+.env.development.local

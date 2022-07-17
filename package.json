@@ -1,0 +1,45 @@
+{
+  "name": "@zero_one/zamm-arb",
+  "version": "0.9.3",
+  "license": "Apache-2.0",
+  "description": "TypeScript Client API",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "scripts": {
+    "arb": "cross-env NODE_ENV=production esr src/index.ts",
+    "dev": "cross-env NODE_ENV=development esr src/index.ts",
+    "local-client": "npm uninstall @zero_one/client && cd ../zo-client &&  npm run build && cd ../zamm_arb && npm i \"@zero_one/client\"@\"file:../zo-client\" --legacy-peer-deps",
+    "npm-client": "npm uninstall @zero_one/client && npm i \"@zero_one/client\"@\"*\" --legacy-peer-deps"
+  },
+  "dependencies": {
+    "@project-serum/anchor": "^0.20.1",
+    "@solana/web3.js": "^1.31.0",
+    "@zero_one/client": "file:../zo-client",
+    "decimal.js": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.1",
+    "@typescript-eslint/eslint-plugin": "^5.7.0",
+    "@typescript-eslint/parser": "^5.7.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.0.1",
+    "eslint": "^8.5.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-config-standard": "^16.0.3",
+    "eslint-plugin-import": "^2.25.3",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "husky": "^7.0.4",
+    "prettier": "^2.5.1",
+    "typedoc": "^0.22.10",
+    "typescript": "^4.5.4"
+  },
+  "prettier": {
+    "trailingComma": "all",
+    "semi": false,
+    "tabWidth": 4,
+    "useTabs": true
+  },
+  "author": ""
+}
