@@ -2,7 +2,7 @@ import {Commitment} from '@solana/web3.js'
 import {
     Cluster,
     getKeypairFromSecretKey,
-    UpdateEvents,
+    sleep,
     Wallet,
     walletFromKeyPair,
     Zamm,
@@ -45,7 +45,7 @@ async function run() {
      * xSensitivity=10 means that event will be only fired if X changes by at least 1/10=0.1 SOL-PERP in balance
      * ySensitivity=100 means that event will be only fired if Y changes by at least 1/100=0.01 USD in balance
      */
-    await arbUser.subscribe()
+    await arbUser.subscribe(false)
     const xSensitivity = 10, ySensitivity = 100
     await zamm.subscribe(xSensitivity, ySensitivity)
 
@@ -54,6 +54,7 @@ async function run() {
                            Y,
                            price
                        }: { X: Decimal, Y: Decimal, price: Decimal }) {
+        console.log(X.toNumber(), Y.toNumber(), price.toNumber())
         /*
         X - corresponds to the amount of SOL/SOL-PERP in the ZAMM (Decimal)
         Y - corresponds to the amount of USD in the ZAMM (Decimal)
@@ -72,7 +73,7 @@ async function run() {
 
 
         //this is the call to make a ZAMM market arb order [get filled at any price]
-        await zamm.limitArb(arbUser.margin)
+        await zamm.limitArb(arbUser.margin, x, limitPrice)
         const myX =  1.0 //buying one SOL-PERP
         await zamm.marketArb(arbUser.margin, myLimitX) // buying myLimitX SOL-PERP from ZAMM at any price
 
@@ -80,14 +81,13 @@ async function run() {
          */
     }
 
-
     // Here is a simple event listener which responds to any changes affecting X or Y in ZAMM
     // zamm.eventEmitter!.addListener(UpdateEvents.zammModified, arb)
 
 
     /**
      * this is an alternative to arb function which allows locked access to the arb function, so one cannot avoid worrying about arbing twice at the same time before finishing the first arb
-     * WARNING: this is not the safest implementation.
+     * WARNING: this is not the safest implementation. Recommend implementing a separate solution depending on one's needs.
      */
     const arbUpdatesQueue: Array<{ X: Decimal, Y: Decimal, price: Decimal }> = []
     let locked = false
@@ -118,7 +118,7 @@ async function run() {
     }
 
     // Here is a simple event listener which responds to any changes affecting X or Y in ZAMM
-    zamm.eventEmitter!.addListener(UpdateEvents.zammModified, lockedArb)
+    // zamm.eventEmitter!.addListener(UpdateEvents.zammModified, lockedArb)
 }
 
 run().then()
