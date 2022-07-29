@@ -2,7 +2,7 @@ import {Commitment} from '@solana/web3.js'
 import {
     Cluster,
     getKeypairFromSecretKey,
-    sleep,
+    // sleep,
     Wallet,
     walletFromKeyPair,
     Zamm,
@@ -11,6 +11,7 @@ import {
 } from '@zero_one/client'
 import {config} from 'dotenv'
 import Decimal from 'decimal.js'
+import {UpdateEvents} from './types'
 
 /**
  * This loads the config data from .env.development.local or from .env.production.local
@@ -18,14 +19,12 @@ import Decimal from 'decimal.js'
  * Config examples are available in configExamples folder
  */
 
-
 config({path: `.env.${process.env.NODE_ENV || 'development'}.local`})
 const SECRET_KEY = process.env.SECRET_KEY
 const COMMITMENT: Commitment = process.env.COMMITMENT! as Commitment
 const SKIP_PREFLIGHT: boolean = process.env.SKIP_PREFLIGHT == 'true'
 const RPC_URL: string = process.env.RPC_URL!
 const CLUSTER: Cluster = process.env.CLUSTER! as Cluster
-
 
 async function run() {
     // this is a simple way to load anchor wallet from Keypair
@@ -46,7 +45,7 @@ async function run() {
      * ySensitivity=100 means that event will be only fired if Y changes by at least 1/100=0.01 USD in balance
      */
     await arbUser.subscribe(false)
-    const xSensitivity = 10, ySensitivity = 100
+    const xSensitivity = 1, ySensitivity = 1
     await zamm.subscribe(xSensitivity, ySensitivity)
 
     async function arb({
@@ -82,8 +81,7 @@ async function run() {
     }
 
     // Here is a simple event listener which responds to any changes affecting X or Y in ZAMM
-    // zamm.eventEmitter!.addListener(UpdateEvents.zammModified, arb)
-
+    zamm.eventEmitter!.addListener(UpdateEvents.zammModified, arb)
 
     /**
      * this is an alternative to arb function which allows locked access to the arb function, so one cannot avoid worrying about arbing twice at the same time before finishing the first arb
