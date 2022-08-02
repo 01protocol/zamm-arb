@@ -7,3 +7,4 @@ dist/
 git
 .env.production.local
 .env.development.local
+.env**
