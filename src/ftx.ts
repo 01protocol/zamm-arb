@@ -1,11 +1,13 @@
 import Decimal from "decimal.js"
 import fetch from "node-fetch"
-import { NewOrderReq, RestClient } from "ftx-api"
+import { NewOrderReq, RestClient, WebsocketClient } from "ftx-api"
 
 export class FtxArbClient {
 	private client: RestClient
+	private wsClient: WebsocketClient
 	private market: FtxMarket
 	private account: FtxAccountInfo
+	private orderbook: FtxOrderbook
 
 	constructor() {
 		this.client = new RestClient(
@@ -13,10 +15,108 @@ export class FtxArbClient {
 			process.env.FTX_SECRET,
 			{ subAccountName: process.env.FTX_SUBACCOUNT },
 		)
+		this.wsClient = new WebsocketClient({
+			key: process.env.FTX_KEY,
+			secret: process.env.FTX_SECRET,
+			subAccountName: process.env.FTX_SUBACCOUNT,
+		})
 	}
 
 	async init() {
 		this.market = await this.getMarket("SOL-PERP")
+	}
+
+	orderbookSubscribe(marketName: string, fn) {
+		this.wsClient.subscribe({ channel: "orderbook", market: marketName })
+		this.wsClient.addListener("update", (up) => {
+			fn()
+			this.orderbookUpdate.bind(this)(up)
+		})
+	}
+
+	orderbookUpdate(update: any): void {
+		if (update.type === "subscribed") {
+			return
+		}
+		if (update.data.action === "partial") {
+			this.orderbook = {
+				asks: update.data.asks,
+				bids: update.data.bids,
+			}
+		} else if (update.data.action === "update") {
+			this.updateAsks.bind(this)(update.data.asks)
+			this.updateBids.bind(this)(update.data.bids)
+		}
+	}
+
+	updateAsks(update: Decimal[][]): void {
+		let ob = this.orderbook.asks
+
+		let obIdx = 0
+		let updateIdx = 0
+		let newBook: Decimal[][] = new Array()
+
+		while (obIdx < ob.length && updateIdx < update.length) {
+			if (ob[obIdx]! < update[updateIdx]!) {
+				newBook.push(ob[obIdx]!)
+				obIdx += 1
+			} else if (ob[obIdx]! > update[updateIdx]!) {
+				newBook.push(update[updateIdx]!)
+				updateIdx += 1
+			} else {
+				if (update[updateIdx]![1] !== new Decimal(0)) {
+					newBook.push(update[updateIdx]!)
+					obIdx += 1
+					updateIdx += 1
+				}
+			}
+		}
+
+		if (obIdx < ob.length) {
+			newBook.concat(ob.slice(obIdx))
+		}
+		if (updateIdx < update.length) {
+			newBook.concat(update.slice(updateIdx))
+		}
+
+		this.orderbook.asks = newBook
+	}
+
+	updateBids(update: Decimal[][]): void {
+		let ob = this.orderbook.bids
+
+		let obIdx = 0
+		let updateIdx = 0
+		let newBook: Decimal[][] = new Array()
+
+		while (obIdx < ob.length && updateIdx < update.length) {
+			if (ob[obIdx]! > update[updateIdx]!) {
+				newBook.push(ob[obIdx]!)
+				obIdx += 1
+			} else if (ob[obIdx]! < update[updateIdx]!) {
+				newBook.push(update[updateIdx]!)
+				updateIdx += 1
+			} else {
+				if (update[updateIdx]![1] !== new Decimal(0)) {
+					newBook.push(update[updateIdx]!)
+					obIdx += 1
+					updateIdx += 1
+				}
+			}
+		}
+
+		if (obIdx < ob.length) {
+			newBook.concat(ob.slice(obIdx))
+		}
+		if (updateIdx < update.length) {
+			newBook.concat(update.slice(updateIdx))
+		}
+
+		this.orderbook.bids = newBook
+	}
+
+	getOrderbook(): FtxOrderbook {
+		return this.orderbook
 	}
 
 	async getMarket(marketName: string): Promise<FtxMarket> {
@@ -33,11 +133,13 @@ export class FtxArbClient {
 	}
 
 	getAsk(): Decimal {
-		return this.market.ask
+		if (this.orderbook !== undefined) return this.orderbook.asks[0]![0]!
+		else return this.market.ask
 	}
 
 	getBid(): Decimal {
-		return this.market.bid
+		if (this.orderbook !== undefined) return this.orderbook.bids[0]![0]!
+		else return this.market.bid
 	}
 
 	async getFtxAccountInfo(): Promise<FtxAccountInfo> {
@@ -62,7 +164,6 @@ export class FtxArbClient {
 			positionsMap: positionsMap,
 		}
 	}
-
 	async getPosition(ftxClient: any, marketId: string): Promise<FtxPosition> {
 		const data = await ftxClient.request({
 			method: "GET",
@@ -146,4 +247,22 @@ export interface FtxMarket {
 	bid: Decimal
 	ask: Decimal
 	last?: Decimal
+}
+
+export interface FtxOrderbook {
+	asks: Decimal[][]
+	bids: Decimal[][]
+}
+
+export interface FtxOrderbookUpdate {
+	channel: string
+	market: string
+	type: string
+	data: {
+		time: Decimal
+		checksum: number
+		bids: Decimal[][]
+		asks: Decimal[][]
+		action: string
+	}
 }

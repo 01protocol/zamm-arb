@@ -60,7 +60,13 @@ async function run() {
 		ySensitivity = 100
 	await zamm.subscribe(xSensitivity, ySensitivity)
 
-	async function arb({
+	ftxClient.orderbookSubscribe("SOL-PERP", arb)
+
+	let x = new Decimal(0)
+	let y = new Decimal(0)
+	let zammPrice = new Decimal(0)
+
+	async function updateZamm({
 		X,
 		Y,
 		price,
@@ -69,7 +75,13 @@ async function run() {
 		Y: Decimal
 		price: Decimal
 	}) {
-		console.log(X.toNumber(), Y.toNumber(), price.toNumber())
+		x = X
+		y = Y
+		zammPrice = price
+		arb()
+	}
+
+	async function arb() {
 		/*
         X - corresponds to the amount of SOL/SOL-PERP in the ZAMM (Decimal)
         Y - corresponds to the amount of USD in the ZAMM (Decimal)
@@ -94,13 +106,14 @@ async function run() {
 
          //at the same time one can add below the code to call other DEX/CEX to hedge the exposure from 01.
          */
-		await ftxClient.refresh()
 		const ftx_price = ftxClient.getAsk().add(ftxClient.getBid()).div(2)
 
-		const diff = ftx_price.sub(price).div(price.add(ftx_price).div(2))
+		const diff = ftx_price
+			.sub(zammPrice)
+			.div(zammPrice.add(ftx_price).div(2))
 
 		console.log(
-			`Zamm price is $${price} and FTX price is $${ftx_price}: diff is ${diff.mul(
+			`Zamm price is $${zammPrice} and FTX price is $${ftx_price}: diff is ${diff.mul(
 				100,
 			)}%`,
 		)
@@ -120,7 +133,7 @@ async function run() {
 		const can_open_long = size > 0 || !isLong
 
 		if (diff.lessThan(-MIN_PROFIT_MARGIN / 100) && can_open_short) {
-			console.log(`Shorting Zamm for ${size} SOL-PERP at $${price}.`)
+			console.log(`Shorting Zamm for ${size} SOL-PERP at $${zammPrice}.`)
 			console.log(`Longing FTX for ${size} SOL-PERP at $${ftx_price}.`)
 			/*
 			await zamm.limitArb(
@@ -138,7 +151,7 @@ async function run() {
 			})
 			*/
 		} else if (diff.greaterThan(MIN_PROFIT_MARGIN / 100) && can_open_long) {
-			console.log(`Longing Zamm for ${size} SOL-PERP at $${price}.`)
+			console.log(`Longing Zamm for ${size} SOL-PERP at $${zammPrice}.`)
 			console.log(`Shorting FTX for ${size} SOL-PERP at $${ftx_price}.`)
 			/*
 			await zamm.limitArb(
@@ -191,7 +204,7 @@ async function run() {
 
 		locked = true
 
-		arb({ X, Y, price })
+		arb()
 
 		if (arbUpdatesQueue.length > 0) {
 			locked = false
@@ -201,7 +214,7 @@ async function run() {
 	}
 
 	// Here is a simple event listener which responds to any changes affecting X or Y in ZAMM
-	zamm.eventEmitter!.addListener(UpdateEvents.zammModified, lockedArb)
+	zamm.eventEmitter!.addListener(UpdateEvents.zammModified, updateZamm)
 }
 
 run().then()
